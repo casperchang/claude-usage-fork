@@ -42,7 +42,7 @@ from claude_usage.ticker import TickerItem
 
 # Base OSD dimensions (at scale=1.0). Ticker adds ~22px to the bottom of
 # the panel; when it's toggled off we collapse back to the original height.
-BASE_WIDTH = 260
+BASE_WIDTH = 312  # 120% of upstream's 260 so the weekly reset + target fit
 BASE_HEIGHT = 100
 TICKER_STRIP_HEIGHT = 22
 NEWS_STRIP_HEIGHT = 16  # second ticker row for latest headline
@@ -138,8 +138,32 @@ def _hex_to_qcolor(hex_str: str, alpha: float = 1.0) -> QColor:
     return QColor(r, g, b, int(alpha * 255))
 
 
+def _format_days_hours(remaining: int) -> str:
+    """Remaining time as '3 days, 5 hrs' / '1 day, 1 hr'."""
+    days, rem = divmod(remaining, 86400)
+    hours = rem // 3600
+    day_s = f"{days} day" + ("" if days == 1 else "s")
+    hr_s = f"{hours} hr" + ("" if hours == 1 else "s")
+    return f"{day_s}, {hr_s}"
+
+
+WEEK_SECONDS = 7 * 86400
+
+
+def _weekly_target(reset_ts: int) -> float | None:
+    """Fraction of the week elapsed since the last weekly reset (0.0-1.0).
+
+    Spending evenly to use the full quota by the reset means weekly usage
+    should sit at this fraction: one day in -> 1/7 = 14%.
+    """
+    if reset_ts <= 0:
+        return None
+    remaining = reset_ts - datetime.now().timestamp()
+    return max(0.0, min(1.0, 1.0 - remaining / WEEK_SECONDS))
+
+
 def _format_reset_short(reset_ts: int) -> str:
-    """Compact reset label: '2h 31m' (< 24h) or 'Mon 16:00' (>= 24h)."""
+    """Compact reset label: '2h 31m' (< 24h) or 'Mon 16:00 (3 days, 5 hrs)' (>= 24h)."""
     if reset_ts <= 0:
         return ""
     remaining = int(reset_ts - datetime.now().timestamp())
@@ -149,7 +173,8 @@ def _format_reset_short(reset_ts: int) -> str:
     minutes = rem // 60
     if hours < 24:
         return f"{hours}h {minutes}m" if hours > 0 else f"{minutes}m"
-    return datetime.fromtimestamp(reset_ts).strftime("%a %H:%M")
+    when = datetime.fromtimestamp(reset_ts).strftime("%a %H:%M")
+    return f"{when} ({_format_days_hours(remaining)})"
 
 
 def _burn_badge_text(alert) -> str:
@@ -1072,6 +1097,7 @@ class UsageOverlay(QWidget):
             label="Weekly",
             pct=self._weekly_pct,
             reset_label=_format_reset_short(self._weekly_reset),
+            target=_weekly_target(self._weekly_reset),
         )
 
         # --- Scoped weekly row (e.g. "Fable") — only when the API reports it ---
@@ -1266,6 +1292,7 @@ class UsageOverlay(QWidget):
         label: str,
         pct: float,
         reset_label: str,
+        target: float | None = None,
     ) -> None:
         """Draw one row: label on the left, reset + percentage on the right, bar below."""
         # Label + percentage baseline. Some skins (dashboard, brutalist)
@@ -1281,8 +1308,18 @@ class UsageOverlay(QWidget):
         p.drawText(QPointF(pad_x, baseline), label_text)
 
         pct_text = f"{int(pct * 100)}%"
+        right = w - pad_x
+        # Even-pace target, e.g. "32% (57%)": dim, to the right of the value.
+        if target is not None:
+            target_text = f" ({int(target * 100)}%)"
+            p.setPen(_hex_to_qcolor(self._theme["text_dim"]))
+            tw = p.fontMetrics().horizontalAdvance(target_text)
+            p.drawText(QPointF(right - tw, baseline), target_text)
+            right -= tw
+            p.setPen(_hex_to_qcolor(self._theme["text_primary"]))
         pct_width = p.fontMetrics().horizontalAdvance(pct_text)
-        p.drawText(QPointF(w - pad_x - pct_width, baseline), pct_text)
+        p.drawText(QPointF(right - pct_width, baseline), pct_text)
+        pct_width = w - pad_x - (right - pct_width)
 
         # Reset-time (between label and percentage, small font)
         if reset_label:
@@ -1298,6 +1335,14 @@ class UsageOverlay(QWidget):
         # rectangle for brutalist/receipt, classic rounded pill otherwise.
         bar_y = y + 14 * self._scale
         self._draw_bar(p, pad_x, bar_y, bar_w, bar_h, bar_r, pct)
+        # Tick on the bar where even-pace usage should be right now.
+        if target is not None:
+            tick = QPen(_hex_to_qcolor(self._theme["text_primary"], 0.8))
+            tick.setWidthF(max(1.0, 1.5 * self._scale))
+            p.setPen(tick)
+            tx = pad_x + bar_w * target
+            p.drawLine(QPointF(tx, bar_y - 2 * self._scale),
+                       QPointF(tx, bar_y + bar_h + 2 * self._scale))
 
     def _paint_paper_grain(self, p: QPainter, w: int, h: int) -> None:
         """Thin horizontal stripes every 4px — thermal-paper grain texture."""

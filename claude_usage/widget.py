@@ -117,10 +117,15 @@ def _format_reset_duration(reset_ts: int) -> str:
 
 
 def _format_reset_day(reset_ts: int) -> str:
-    """``'Resets Mon 04:00 PM'`` / ``''``."""
+    """``'Resets Mon 04:00 PM (3 days, 5 hrs)'`` / ``''``."""
     if reset_ts <= 0:
         return ""
-    return datetime.fromtimestamp(reset_ts).strftime("Resets %a %I:%M %p")
+    label = datetime.fromtimestamp(reset_ts).strftime("Resets %a %I:%M %p")
+    remaining = int(reset_ts - datetime.now().timestamp())
+    if remaining >= 86400:
+        from .overlay import _format_days_hours
+        label += f" ({_format_days_hours(remaining)})"
+    return label
 
 
 def _format_session_duration(total_seconds: int) -> str:
@@ -756,6 +761,17 @@ class UsagePopup(QWidget):
             _format_reset_day(stats.weekly_reset),
             stats.weekly_utilization,
         )
+        from .overlay import _weekly_target
+        target = _weekly_target(stats.weekly_reset)
+        if target is not None:
+            diff = int(stats.weekly_utilization * 100) - int(target * 100)
+            if diff > 0:
+                pace = f"{diff} pts ahead of pace, may hit the limit early"
+            elif diff < 0:
+                pace = f"{-diff} pts behind pace, quota may go unused"
+            else:
+                pace = "on pace"
+            self._add_dim_line(f"Even-pace target: {int(target * 100)}% ({pace})")
         # Optional model-scoped weekly cap (e.g. Fable) — only when the API
         # reports it (temporary limit; auto-hides when it goes away).
         if getattr(stats, "scoped_label", ""):
