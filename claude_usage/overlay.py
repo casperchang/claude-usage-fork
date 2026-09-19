@@ -1325,7 +1325,17 @@ class UsageOverlay(QWidget):
         if reset_label:
             p.setFont(_mono_font(int(font_small)))
             p.setPen(_hex_to_qcolor(self._theme["text_dim"]))
-            rw = p.fontMetrics().horizontalAdvance(reset_label)
+            fm_small = p.fontMetrics()
+            rw = fm_small.horizontalAdvance(reset_label)
+            # Never overlap the row label: at large zoom levels the reset
+            # text can outgrow the gap, so drop its "(N days, N hrs)" tail.
+            p.setFont(_mono_font(int(font_label)))
+            label_w = p.fontMetrics().horizontalAdvance(label_text)
+            p.setFont(_mono_font(int(font_small)))
+            room = (w - pad_x - pct_width - 8 * self._scale) - (pad_x + label_w + 6 * self._scale)
+            if rw > room and " (" in reset_label:
+                reset_label = reset_label.split(" (")[0]
+                rw = fm_small.horizontalAdvance(reset_label)
             p.drawText(
                 QPointF(w - pad_x - pct_width - 8 * self._scale - rw, baseline),
                 reset_label,
