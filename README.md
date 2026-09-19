@@ -1,3 +1,65 @@
+# Claude Usage Widget — fork with weekly pace target
+
+> **This is a fork of [bozdemir/claude-usage-widget](https://github.com/bozdemir/claude-usage-widget)** (MIT), based on upstream **v0.12.5**. All the hard work — the Qt overlay, the usage collector, skins, themes, forecasts, cost tracking — is the original author's. This fork only adds the small changes below. Please star and support the original project.
+
+## What this fork adds
+
+| Change | Where |
+|---|---|
+| **Weekly even-pace target** — the Weekly row shows `32% (61%)`: your usage vs. the share of the week already elapsed. A tick on the bar marks the target, so you can see at a glance whether you are on track to use the whole weekly quota or to run out early. | `overlay.py`, `widget.py` |
+| **Time left until the weekly reset** — `Tue 05:00 (2 days, 17 hrs)` instead of just `Tue 05:00`. | `overlay.py`, `widget.py` |
+| **Wider card** — 312 px instead of 260 px (120 %) so the extra text fits. | `overlay.py` |
+| **Details popup** — an *Even-pace target* line: `61% (29 pts behind pace, quota may go unused)`. | `widget.py` |
+| **Status-line feed** — `scripts/statusline-usage.sh` copies the rate limits Claude Code already has into a file the widget reads. This avoids the shared `/api/oauth/usage` endpoint returning HTTP 429, which made the stock widget silently show stale numbers (e.g. 0 % while the real value was 16 %). | `scripts/` |
+| **`scripts/claude-widget.sh`** — `start`, `stop`, `restart`, `status` for the widget. | `scripts/` |
+
+Planned: several Claude accounts and Google AI Pro / Antigravity quota in one widget, fed from a small collector on one always-on machine.
+
+### How the target works
+
+`target = time elapsed since the last weekly reset ÷ 7 days`. One day after a reset the target is 14 %, three and a half days in it is 50 %. If the bar is **behind** the tick you are using less than an even pace, so part of the week's quota may be wasted at the next reset; if it is **past** the tick you may hit the limit early.
+
+### Install this fork
+
+```bash
+uv tool install git+https://github.com/casperchang/claude-usage-fork
+claude-usage --detach
+```
+
+(The package name is unchanged from upstream, so do not install both into the same environment.)
+
+### Recommended: feed the widget from Claude Code's status line
+
+Claude Code passes its rate limits to your status-line command. Save them for the widget:
+
+```bash
+cp scripts/statusline-usage.sh ~/.claude/statusline-usage.sh
+```
+
+Then in `~/.claude/settings.json`:
+
+```json
+{ "statusLine": { "type": "command", "command": "~/.claude/statusline-usage.sh" } }
+```
+
+and in `~/.config/claude-usage/config.json`:
+
+```json
+{ "statusline_cache_path": "~/.cache/claude-usage/statusline.json" }
+```
+
+While a Claude Code session is open the numbers are seconds old, and the shared usage endpoint is only called every few minutes.
+
+### Control script
+
+```bash
+scripts/claude-widget.sh start | stop | restart | status
+```
+
+---
+
+# Original README (upstream, v0.12.5)
+
 # Claude Usage Widget
 
 A cross-platform desktop widget that displays your Claude Code usage limits in real time. Always-on-top OSD overlay showing session and weekly utilization — built with PySide6 (Qt), so a single `pip install` works on Linux, macOS, and Windows.
