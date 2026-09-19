@@ -2,6 +2,16 @@
 
 > **This is a fork of [bozdemir/claude-usage-widget](https://github.com/bozdemir/claude-usage-widget)** (MIT), based on upstream **v0.12.5**. All the hard work — the Qt overlay, the usage collector, skins, themes, forecasts, cost tracking — is the original author's. This fork only adds the small changes below. Please star and support the original project.
 
+<p align="center">
+  <img src="screenshots/fork-osd.png" alt="Floating card: Session 43%, Weekly 32% (61%) with the time to reset and a target tick on the bar" width="520" /><br/>
+  <em>The floating card. <b>Weekly 32% (61%)</b> means you have used 32% while 61% of the week has already passed; the tick on the bar marks that even-pace point, and the reset shows the time left.</em>
+</p>
+
+<p align="center">
+  <img src="screenshots/fork-popup.png" alt="Details popup with the even-pace target line" width="520" /><br/>
+  <em>Click the card for details, now with an <b>Even-pace target</b> line: how many points ahead of or behind pace you are. (Sample data, not real usage.)</em>
+</p>
+
 ## What this fork adds
 
 | Change | Where |
