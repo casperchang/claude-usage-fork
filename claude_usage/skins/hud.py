@@ -59,6 +59,8 @@ METRICS = {
     # Codex adds TWO gauges below the pair, each the same footprint as the
     # scoped gauge (osd_height_scoped - osd_height). Additive with scoped.
     "codex_rows_height": 2 * (370 - 220),
+    # Same two-gauge footprint for the optional Gemini pair.
+    "gemini_rows_height": 2 * (370 - 220),
     "osd_radius": 10, "osd_padding": 14,
     "ring_size": 118, "ring_stroke": 10,
     "ring_size_popup": 140, "ring_stroke_popup": 12,
@@ -156,11 +158,14 @@ def paint_osd(p: QPainter, rect: QRectF, data, scale: float = 1.0) -> None:
     # in the identical HUD style. When absent the OSD renders byte-for-byte as
     # before. The overlay grows the panel by METRICS['codex_rows_height'].
     codex_present = getattr(data, "codex_available", False)
+    # Optional second provider (Gemini / Google AI Pro): same two-gauge
+    # treatment as Codex, stacked after it.
+    gemini_present = getattr(data, "gemini_available", False)
 
     # gauges — equally spaced. When a scoped/codex gauge is present the pair
     # stays anchored to the original-height centre (top of the taller window)
     # so the extra gauges sit beneath it and the ticker slides to the bottom.
-    if scoped_present or codex_present:
+    if scoped_present or codex_present or gemini_present:
         y_mid = rect.y() + m["osd_height"] * s / 2 + 10 * s
     else:
         y_mid = rect.y() + rect.height() / 2 + 10 * s
@@ -207,6 +212,17 @@ def paint_osd(p: QPainter, rect: QRectF, data, scale: float = 1.0) -> None:
         y_codex_7d = y_mid + (base + 2) * single_row
         paint_gauge(p, cx, y_codex_7d, data.codex_weekly_pct, "CODEX 7D",
                     f"{data.codex_weekly_reset_hrs}h {data.codex_weekly_reset_min}m", s)
+
+    # Gemini (optional second provider) — two more centred gauges, taking the
+    # slots after the scoped gauge and the Codex pair, whichever are present.
+    if gemini_present:
+        base = (1 if scoped_present else 0) + (2 if codex_present else 0)
+        y_gemini_5h = y_mid + (base + 1) * single_row
+        paint_gauge(p, cx, y_gemini_5h, data.gemini_session_pct, "GEMINI 5H",
+                    f"{data.gemini_session_reset_min}m", s)
+        y_gemini_7d = y_mid + (base + 2) * single_row
+        paint_gauge(p, cx, y_gemini_7d, data.gemini_weekly_pct, "GEMINI 7D",
+                    f"{data.gemini_weekly_reset_hrs}h {data.gemini_weekly_reset_min}m", s)
 
     # Ticker strip along the bottom — bordered separator + amber-tiered
     # quartile colours matching the cockpit palette.

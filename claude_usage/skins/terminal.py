@@ -62,6 +62,7 @@ METRICS = {
     "osd_height":      172,
     "osd_height_scoped": 212,  # +1 Session/Weekly row footprint (2*line_h + row_gap + 2)
     "codex_rows_height": 80,   # 2 × (osd_height_scoped − osd_height) = two extra rows
+    "gemini_rows_height": 80,  # same two-row footprint for the Gemini pair
     "osd_radius":      6,
     "osd_padding":     12,
     "osd_row_gap":     8,
@@ -193,6 +194,36 @@ def paint_osd(p: QPainter, rect: QRectF, data, scale: float = 1.0) -> None:
                   hex_to_qcolor(t["text_secondary"]), body_f)
         y_bar = y_row + line_h + 2 * s
         draw_ascii_bar(p, x, y_bar + fm.ascent(), data.codex_weekly_pct,
+                       m["osd_bar_cols"],
+                       hex_to_qcolor(t["accent"]), hex_to_qcolor(t["very_dim"]),
+                       body_f)
+
+    # gemini rows — optional second-provider (Google AI Pro) 5h + 7d windows.
+    # Same treatment as the codex rows above, stacked after them.
+    if getattr(data, "gemini_available", False):
+        # gemini 5h — mirrors the session row
+        y_row = y_bar + line_h + m["osd_row_gap"] * s
+        draw_text(p, x, y_row + fm.ascent(), "gemini 5h",
+                  hex_to_qcolor(t["text_secondary"]), body_f)
+        right = f"{data.gemini_session_reset_min}m · {int(data.gemini_session_pct*100)}%"
+        rw = fm.horizontalAdvance(right)
+        draw_text(p, x + w - rw, y_row + fm.ascent(), right,
+                  hex_to_qcolor(t["text_secondary"]), body_f)
+        y_bar = y_row + line_h + 2 * s
+        draw_ascii_bar(p, x, y_bar + fm.ascent(), data.gemini_session_pct,
+                       m["osd_bar_cols"],
+                       hex_to_qcolor(t["accent"]), hex_to_qcolor(t["very_dim"]),
+                       body_f)
+        # gemini 7d — mirrors the weekly row
+        y_row = y_bar + line_h + m["osd_row_gap"] * s
+        draw_text(p, x, y_row + fm.ascent(), "gemini 7d",
+                  hex_to_qcolor(t["text_secondary"]), body_f)
+        right = f"{data.gemini_weekly_reset_hrs}h {data.gemini_weekly_reset_min}m · {int(data.gemini_weekly_pct*100)}%"
+        rw = fm.horizontalAdvance(right)
+        draw_text(p, x + w - rw, y_row + fm.ascent(), right,
+                  hex_to_qcolor(t["text_secondary"]), body_f)
+        y_bar = y_row + line_h + 2 * s
+        draw_ascii_bar(p, x, y_bar + fm.ascent(), data.gemini_weekly_pct,
                        m["osd_bar_cols"],
                        hex_to_qcolor(t["accent"]), hex_to_qcolor(t["very_dim"]),
                        body_f)

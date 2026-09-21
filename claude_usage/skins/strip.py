@@ -51,6 +51,8 @@ METRICS = {
     # Two extra stacked rows (Codex 5h + Codex 7d), each the same footprint
     # the scoped row already claims: 2 × (osd_height_scoped - osd_height).
     "codex_rows_height": 108,
+    # Same two-band footprint for the optional Gemini pair.
+    "gemini_rows_height": 108,
 }
 
 FONTS = {"family_mono": "JetBrains Mono", "family_ui": "Inter",
@@ -199,6 +201,31 @@ def paint_osd(p: QPainter, rect: QRectF, data, scale: float = 1.0) -> None:
         seg(xs, mid_w * 2, "CODEX 7D", data.codex_weekly_pct,
             f"{data.codex_weekly_reset_hrs}h", t["accent2"],
             top=codex_top, bh=base_h)
+
+    # optional Gemini second-provider rows (Google AI Pro) — two more stacked
+    # bands continuing the same cursor: Session → Weekly → [scoped] →
+    # [Codex 5h/7d] → Gemini 5h → Gemini 7d.
+    if getattr(data, "gemini_available", False):
+        gemini_top = base_bottom
+        if scoped_pct is not None and getattr(data, "scoped_label", ""):
+            gemini_top += base_h
+        if getattr(data, "codex_available", False):
+            gemini_top += 2 * base_h
+        # Gemini 5h — mirrors SESSION (accent, "{min}m" reset)
+        p.setPen(hex_to_qcolor(t["border"]))
+        p.drawLine(QPointF(rect.x() + 4 * s, gemini_top),
+                   QPointF(rect.right() - 4 * s, gemini_top))
+        seg(xs, mid_w * 2, "GEMINI 5H", data.gemini_session_pct,
+            f"{data.gemini_session_reset_min}m", t["accent"],
+            top=gemini_top, bh=base_h)
+        # Gemini 7d — mirrors WEEKLY (accent2, "{hrs}h" reset)
+        gemini_top += base_h
+        p.setPen(hex_to_qcolor(t["border"]))
+        p.drawLine(QPointF(rect.x() + 4 * s, gemini_top),
+                   QPointF(rect.right() - 4 * s, gemini_top))
+        seg(xs, mid_w * 2, "GEMINI 7D", data.gemini_weekly_pct,
+            f"{data.gemini_weekly_reset_hrs}h", t["accent2"],
+            top=gemini_top, bh=base_h)
 
 
 # ---- POPUP ---------------------------------------------------------

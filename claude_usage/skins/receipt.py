@@ -61,6 +61,8 @@ METRICS = {
     # the single scoped-row footprint (265-234=31). The overlay adds this on top
     # of any scoped height so both providers can show at once.
     "codex_rows_height": 62,
+    # Same two-row footprint for the optional Gemini pair.
+    "gemini_rows_height": 62,
     "popup_width": 540, "popup_padding": 26,
     "grain_step_px": 3, "ticker_h": 22,
 }
@@ -203,6 +205,35 @@ def paint_osd(p: QPainter, rect: QRectF, data, scale: float = 1.0) -> None:
         p.drawRect(QRectF(x, yy, w, 8 * s))
         p.setPen(Qt.NoPen); p.setBrush(hex_to_qcolor(t["ink"]))
         p.drawRect(QRectF(x, yy, w * data.codex_weekly_pct, 8 * s))
+
+    # GEMINI — optional second-provider pair (Google AI Pro 5h + 7d), drawn
+    # in the same two native receipt lines as the Codex block above.
+    if getattr(data, "gemini_available", False):
+        yy += 8 * s + 6 * s
+        draw_text(p, x, yy + fm.ascent(), "GEMINI 5H",
+                  hex_to_qcolor(t["ink"]), body_f)
+        right = f"{int(data.gemini_session_pct * 100)}% · {data.gemini_session_reset_min}m"
+        rw = fm.horizontalAdvance(right)
+        draw_text(p, x + w - rw, yy + fm.ascent(), right,
+                  hex_to_qcolor(t["ink"]), body_f)
+        yy += fm.height() + 2 * s
+        p.setPen(hex_to_qcolor(t["rule"])); p.setBrush(hex_to_qcolor(t["bar_track"]))
+        p.drawRect(QRectF(x, yy, w, 8 * s))
+        p.setPen(Qt.NoPen); p.setBrush(hex_to_qcolor(t["ink"]))
+        p.drawRect(QRectF(x, yy, w * data.gemini_session_pct, 8 * s))
+
+        yy += 8 * s + 6 * s
+        draw_text(p, x, yy + fm.ascent(), "GEMINI 7D",
+                  hex_to_qcolor(t["ink"]), body_f)
+        right = f"{int(data.gemini_weekly_pct * 100)}% · {data.gemini_weekly_reset_hrs}h{data.gemini_weekly_reset_min}m"
+        rw = fm.horizontalAdvance(right)
+        draw_text(p, x + w - rw, yy + fm.ascent(), right,
+                  hex_to_qcolor(t["ink"]), body_f)
+        yy += fm.height() + 2 * s
+        p.setPen(hex_to_qcolor(t["rule"])); p.setBrush(hex_to_qcolor(t["bar_track"]))
+        p.drawRect(QRectF(x, yy, w, 8 * s))
+        p.setPen(Qt.NoPen); p.setBrush(hex_to_qcolor(t["ink"]))
+        p.drawRect(QRectF(x, yy, w * data.gemini_weekly_pct, 8 * s))
 
     # Ticker marquee (between the weekly bar and the thank-you footer).
     yy += 8 * s + 6 * s

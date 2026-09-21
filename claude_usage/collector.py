@@ -20,6 +20,7 @@ from urllib.request import Request, urlopen
 from claude_usage import forecast, pricing
 from claude_usage import budget as _budget
 from claude_usage import codex as _codex
+from claude_usage import gemini as _gemini
 from claude_usage import peak as _peak
 from claude_usage.analytics import AnomalyReport, detect_anomaly, generate_tips
 from claude_usage.burn import (
@@ -87,6 +88,15 @@ class UsageStats:
     codex_session_reset: int = 0
     codex_weekly_utilization: float = 0.0
     codex_weekly_reset: int = 0
+    # Optional second provider: Google AI Pro quota read from a running
+    # Antigravity IDE, populated only when "gemini" is listed in the
+    # `providers` config key. gemini_available=False means the overlay
+    # draws no Gemini rows at all.
+    gemini_available: bool = False
+    gemini_session_utilization: float = 0.0
+    gemini_session_reset: int = 0
+    gemini_weekly_utilization: float = 0.0
+    gemini_weekly_reset: int = 0
     overage_status: str = ""  # "rejected" or "allowed"
     fallback_status: str = ""  # "available" or ""
     rate_limit_error: str = ""  # error message if API call fails
@@ -1321,5 +1331,22 @@ def collect_all(config: dict[str, Any]) -> UsageStats:
             stats.codex_weekly_reset = int(cx["weekly_reset"])
         except Exception:
             stats.codex_available = False
+
+    # Optional second provider: Google AI Pro (opt-in via `providers`
+    # config). collect_gemini serves an on-disk cache between polls, so
+    # calling it on every refresh cycle is cheap; a failure — including
+    # Antigravity simply not running — just hides the Gemini rows.
+    if "gemini" in (config.get("providers") or []):
+        try:
+            gm = _gemini.collect_gemini(
+                poll_seconds=int(config.get("gemini_poll_seconds", 300) or 300),
+                group=str(config.get("gemini_group", "gemini") or "gemini"))
+            stats.gemini_available = bool(gm["available"])
+            stats.gemini_session_utilization = float(gm["session_pct"])
+            stats.gemini_session_reset = int(gm["session_reset"])
+            stats.gemini_weekly_utilization = float(gm["weekly_pct"])
+            stats.gemini_weekly_reset = int(gm["weekly_reset"])
+        except Exception:
+            stats.gemini_available = False
 
     return stats

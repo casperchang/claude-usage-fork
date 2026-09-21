@@ -169,6 +169,7 @@ Gauge variants for every theme are available at `screenshots/osd-gauge-<theme>.p
 - **Real API data** -- 5h / 7d plan utilisation read from Claude Code's `/api/oauth/usage` endpoint (the same data the Claude UI shows)
 - **Model-scoped weekly bar** -- when Anthropic reports a separate weekly cap for a specific model (e.g. **Fable**), a third bar appears automatically below Session and Weekly, labelled with the model name. It auto-hides when the API stops reporting it — works in bars, gauge, all 11 themes, and the detail popup.
 - **Second provider (opt-in)** -- also track your local **OpenAI Codex** usage alongside Claude's: add `"codex"` to the `providers` config and the widget shows Codex 5h/weekly rows beneath Claude's (extra bars in bars view, a 2×2 ring grid in gauge), rendered natively in **all 11 themes**. Auto-hides when the Codex CLI is missing or logged out; off by default. See [Second provider: OpenAI Codex](#second-provider-openai-codex-opt-in).
+- **Google AI Pro (opt-in)** -- also track your **Google AI Pro** quota alongside Claude's: add `"gemini"` to the `providers` config and the widget shows Gemini 5h/weekly rows beneath Claude's, read live from a running **Antigravity** IDE — the same numbers its own quota panel shows. Auto-hides when Antigravity isn't running; off by default. See [Google AI Pro via Antigravity](#google-ai-pro-via-antigravity-opt-in).
 - **OSD overlay** -- transparent, frameless; left-click opens the details popup, right-click shows a context menu. Stays on top by default — toggle it off to use it as a background desktop widget.
 - **Live token stream** -- `● LIVE 5.3k tok/min` badge on the OSD while a Claude Code session is actively writing, derived from the conversation JSONLs
 - **Per-turn cost ticker** -- a scrolling strip at the bottom of the OSD shows the USD cost of each assistant turn as it lands (`$0.156 ← Bash · 116`), colour-coded by quartile within the visible window so the tape always stays visually varied. Toggle via right-click → "Show cost ticker" or set `"show_ticker": false` in `config.json`.
@@ -330,6 +331,41 @@ You get two extra rows in bars view — **Codex 5h** and **Codex 7d** — or a s
 
 The default `providers` is `["claude"]`, so existing users see no change.
 
+## Google AI Pro via Antigravity (opt-in)
+
+Use Google's **Antigravity** IDE on the same machine? The widget can show your
+Google AI Pro quota right beneath Claude's rows. Add `"gemini"` to `providers`
+in `config.json`:
+
+```json
+{
+    "providers": ["claude", "gemini"]
+}
+```
+
+You get two extra rows in bars view — **Gemini 5h** and **Gemini 7d** — or a
+second pair of rings in gauge view, styled to match whichever of the 11 themes
+you're on. Both providers can run at once; their rows stack.
+
+- **Data source** — the widget calls `RetrieveUserQuotaSummary` on the
+  Antigravity IDE's own localhost `language_server`, which is exactly what the
+  app's quota panel calls. Nothing leaves your machine: no Google API key, no
+  cloud request, no account data stored or logged.
+- **Remaining vs used** — Antigravity reports a `remainingFraction`; the widget
+  draws *used* percentage, so a bar at 3 % means 97 % of your quota is left.
+- **Which pool** — `gemini_group` picks the quota group. `"gemini"` (default) is
+  the Google-model pool (Gemini Pro/Flash); `"3p"` is the third-party pool
+  (Claude/GPT served *through* Antigravity). Both belong to the same Google AI
+  Pro subscription but are metered separately, so they move independently.
+- **Cheap** — the RPC runs at most once per `gemini_poll_seconds` (default
+  300 s), with an on-disk cache served in between.
+- **Graceful** — Antigravity picks a fresh port and CSRF token every launch, so
+  the widget rediscovers them on each poll rather than caching a stale address.
+  Close the IDE and the last reading is served for up to an hour, after which
+  the rows hide. POSIX-only for now (Linux/macOS).
+
+The default `providers` is `["claude"]`, so existing users see no change.
+
 ## Configuration
 
 All settings are optional. Copy `config.json.example` to `config.json` and edit the values you want to change:
@@ -358,8 +394,10 @@ cp config.json.example config.json
 | `statusline_cache_path` | `""` | Path to a statusLine-dumped rate-limit JSON file (see [Statusline-fed rate limits](#statusline-fed-rate-limits)). Empty = disabled. |
 | `usage_endpoint_min_seconds` | `300` | With `statusline_cache_path` set: while the dump is seconds-fresh, `/api/oauth/usage` is called at most once per this many seconds. |
 | `osd_opacity` | `0.75` | OSD background opacity (0.15--1.0) |
-| `providers` | `["claude"]` | Add `"codex"` to also poll the local OpenAI Codex CLI (`codex app-server`) and show its 5h/weekly usage beneath Claude's — an extra ring row in gauge view, two extra bars in bars view. POSIX-only. |
+| `providers` | `["claude"]` | Add `"codex"` to also poll the local OpenAI Codex CLI (`codex app-server`), and/or `"gemini"` to poll a running Antigravity IDE for Google AI Pro quota. Each shows its 5h/weekly usage beneath Claude's — an extra ring row in gauge view, two extra bars in bars view. POSIX-only. |
 | `codex_poll_seconds` | `300` | How often (seconds) to spawn the codex app-server RPC; an on-disk cache is served in between. |
+| `gemini_poll_seconds` | `300` | How often (seconds) to call Antigravity's quota RPC; an on-disk cache is served in between. |
+| `gemini_group` | `"gemini"` | Which Antigravity quota group to show: `"gemini"` (Gemini Pro/Flash) or `"3p"` (Claude/GPT served through Antigravity). |
 | `daily_message_limit` | `200` | Daily message limit for local tracking in the popup |
 | `weekly_message_limit` | `1000` | Weekly message limit for local tracking in the popup |
 | `daily_token_limit` | `5000000` | Daily token limit for local tracking |
@@ -385,7 +423,7 @@ cp config.json.example config.json
 | `budget_notify_enabled` / `budget_notify_ratio` | `true` / `1.0` | Whether the budget projection notification fires, and at what fraction of the cap (`0.9` warns at 90%). |
 | `burn_alerts_enabled` | `true` | Real-time OSD badge + debounced notification when the 5h window burns fast or a turn / retry-loop spikes tokens. Tune with `burn_warn_pct_per_min` (`2.0`), `burn_crit_pct_per_min` (`5.0`), `burn_window_seconds` (`600`), `spike_token_multiplier` (`4.0`), `spike_min_tokens` (`20000`), `spike_baseline_min_turns` (`5`), `retry_storm_turns` (`3`), `retry_storm_window_seconds` (`120`), `burn_alert_cooldown_seconds` (`900`). |
 
-Keys omitted from `config.json` fall back to built-in defaults, so `config.json.example` is an intentionally minimal starter listing only the most commonly changed keys. Everything else in the table above — the opt-in providers (Codex), statusline/endpoint tuning, the burn / peak / budget alerts, the localhost API, webhooks, and the auto-persisted OSD state — simply uses its default until you add it.
+Keys omitted from `config.json` fall back to built-in defaults, so `config.json.example` is an intentionally minimal starter listing only the most commonly changed keys. Everything else in the table above — the opt-in providers (Codex, Gemini), statusline/endpoint tuning, the burn / peak / budget alerts, the localhost API, webhooks, and the auto-persisted OSD state — simply uses its default until you add it.
 
 ## Themes
 
@@ -492,6 +530,9 @@ sudo pacman -S libnotify          # Arch
 - Make sure the Claude Code CLI is installed and you are logged in (the `claude` command should work in a terminal).
 - The OAuth token is loaded in this order: the `CLAUDE_CODE_OAUTH_TOKEN` environment variable, then `~/.claude/.credentials.json`, then (macOS only) the login Keychain.
 - **macOS — blank session/weekly with "No credentials":** Claude Code often stores the token only in the Keychain, and a GUI launch (Finder / Homebrew / a login item) may not have access to it. Launch `claude-usage` once from a Terminal and click **Always Allow** on the Keychain prompt, or export `CLAUDE_CODE_OAUTH_TOKEN`.
+
+### Gemini rows disappeared
+The opt-in Gemini rows auto-hide when the Antigravity IDE isn't running — the widget reads quota from that app's own local server, so there is nothing to ask when it's closed. Closing Antigravity keeps the last reading on screen for up to an hour, then the rows hide. They also stay hidden on Windows (the provider is POSIX-only). If Antigravity *is* running and the rows never appear, check that `"gemini"` is in `providers` and that `gemini_group` matches a group the app reports.
 
 ### Codex rows disappeared
 The opt-in Codex rows auto-hide whenever `codex app-server` returns no rate-limit data. The most common cause is an expired OpenAI token — run `codex login` and the rows come back on the next poll. They also stay hidden when the `codex` CLI isn't on `PATH`, and on Windows (the provider is POSIX-only).

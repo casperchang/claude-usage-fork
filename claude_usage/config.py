@@ -40,14 +40,24 @@ DEFAULT_CONFIG: Config = {
     # budget (a low-volume endpoint shared with Claude Code).
     "refresh_seconds": 60,
 
-    # Which providers to collect. "claude" is always the primary; add "codex"
-    # to also poll the local OpenAI Codex CLI (`codex app-server`) and show
-    # its 5h/weekly rings & bars beneath Claude's. POSIX-only.
+    # Which providers to collect. "claude" is always the primary; add
+    # "gemini" to also poll the running Antigravity IDE for Google AI Pro
+    # quota, or "codex" for the local OpenAI Codex CLI (`codex app-server`),
+    # and show their 5h/weekly rings & bars beneath Claude's. POSIX-only.
     "providers": ["claude"],
     # How often (seconds) to actually spawn the codex app-server RPC; between
     # polls the on-disk cache is served. The RPC takes a couple of seconds,
     # so keep this much larger than refresh_seconds.
     "codex_poll_seconds": 300,
+    # How often (seconds) to actually call Antigravity's quota RPC; between
+    # polls the on-disk cache is served. Quota moves slowly and the windows
+    # are 5h/weekly, so there is nothing to gain from polling it hard.
+    "gemini_poll_seconds": 300,
+    # Which Antigravity quota group to display. "gemini" is the Google-model
+    # pool (Gemini Pro/Flash); "3p" is the third-party pool (Claude/GPT
+    # served through Antigravity). Both belong to the same Google AI Pro
+    # subscription but are metered separately.
+    "gemini_group": "gemini",
 
     # Max poll interval (seconds) the adaptive backoff climbs to when the API
     # rate-limits/errors; it snaps back to refresh_seconds on the next clean

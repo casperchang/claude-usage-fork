@@ -63,6 +63,8 @@ METRICS = {
     # extra SESSION/WEEKLY-style rows (Codex 5h + Codex 7d), i.e. twice the
     # single-row footprint the scoped row already reserves (286 - 224 = 62).
     "codex_rows_height": 124,
+    # Same two-row footprint for the optional Gemini pair.
+    "gemini_rows_height": 124,
 }
 
 FONTS = {"family_mono": "Space Mono", "body_pt": 10, "title_pt": 11}
@@ -166,6 +168,15 @@ def paint_osd(p: QPainter, rect: QRectF, data, scale: float = 1.0) -> None:
                  f"RESETS {data.codex_session_reset_min}M", t["accent"])
         yy = row(yy, "CODEX 7D", data.codex_weekly_pct,
                  f"RESETS {data.codex_weekly_reset_hrs}H {data.codex_weekly_reset_min}M",
+                 t["ink"])
+
+    # Optional Gemini second provider (Google AI Pro) — same black/red bar
+    # rhythm and the same guard as the Codex pair above.
+    if getattr(data, "gemini_available", False):
+        yy = row(yy, "GEMINI 5H", data.gemini_session_pct,
+                 f"RESETS {data.gemini_session_reset_min}M", t["accent"])
+        yy = row(yy, "GEMINI 7D", data.gemini_weekly_pct,
+                 f"RESETS {data.gemini_weekly_reset_hrs}H {data.gemini_weekly_reset_min}M",
                  t["ink"])
 
     # 2px rule above the ticker strip — matches the Swiss-grid section

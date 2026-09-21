@@ -53,6 +53,7 @@ THEME = {
 METRICS = {
     "osd_width": 380, "osd_height": 196, "osd_height_scoped": 256, "osd_radius": 8, "osd_padding": 14,
     "codex_rows_height": 120,  # 2 × (osd_height_scoped - osd_height) = 2 × 60
+    "gemini_rows_height": 120,  # same two-row footprint for the Gemini pair
     "popup_width": 540, "popup_padding": 18,
     "ring_size": 58, "ring_stroke": 6, "row_bar_height": 4,
     "ticker_h": 24,
@@ -148,6 +149,17 @@ def paint_osd(p: QPainter, rect: QRectF, data, scale: float = 1.0) -> None:
         rows.append((
             "CODEX 7D", data.codex_weekly_pct,
             f"{data.codex_weekly_reset_hrs}h {data.codex_weekly_reset_min}m", t["accent2"],
+        ))
+    # Optional Gemini second-provider pair (Google AI Pro) — same idiom and
+    # same reserved-height contract as the Codex pair above.
+    if getattr(data, "gemini_available", False):
+        rows.append((
+            "GEMINI 5H", data.gemini_session_pct,
+            f"{data.gemini_session_reset_min}m", t["accent"],
+        ))
+        rows.append((
+            "GEMINI 7D", data.gemini_weekly_pct,
+            f"{data.gemini_weekly_reset_hrs}h {data.gemini_weekly_reset_min}m", t["accent2"],
         ))
     y_cursor = y + fm.height() + 8 * s
     fm_metric = QFontMetrics(metric_f)

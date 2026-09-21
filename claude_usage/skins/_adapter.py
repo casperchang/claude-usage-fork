@@ -50,6 +50,15 @@ class SkinData:
     codex_weekly_pct: float = 0.0
     codex_weekly_reset_hrs: int = 0
     codex_weekly_reset_min: int = 0
+    # Optional second provider (Google AI Pro via Antigravity). Same shape
+    # and same rules as the Codex block above: gemini_available=False →
+    # skins draw no Gemini rows.
+    gemini_available: bool = False
+    gemini_session_pct: float = 0.0
+    gemini_session_reset_min: int = 0
+    gemini_weekly_pct: float = 0.0
+    gemini_weekly_reset_hrs: int = 0
+    gemini_weekly_reset_min: int = 0
     live_tok_per_min: float = 0.0  # in thousands (e.g. 10.5 means 10.5k)
     is_live: bool = False
     subagent_count: int = 0
@@ -287,6 +296,23 @@ def from_usage_stats(
             codex_weekly_reset_hrs = cw_left // 3600
             codex_weekly_reset_min = (cw_left % 3600) // 60
 
+    # Optional Gemini provider — 5h mirrors Session, weekly mirrors Weekly.
+    gemini_available = bool(getattr(stats, "gemini_available", False))
+    gemini_session_pct = gemini_weekly_pct = 0.0
+    gemini_session_reset_min = gemini_weekly_reset_hrs = gemini_weekly_reset_min = 0
+    if gemini_available:
+        gemini_session_pct = max(0.0, min(1.0, float(
+            getattr(stats, "gemini_session_utilization", 0.0) or 0.0)))
+        gemini_weekly_pct = max(0.0, min(1.0, float(
+            getattr(stats, "gemini_weekly_utilization", 0.0) or 0.0)))
+        if getattr(stats, "gemini_session_reset", 0) > 0:
+            gs_left = max(0, int(stats.gemini_session_reset - now_ts))
+            gemini_session_reset_min = gs_left // 60
+        if getattr(stats, "gemini_weekly_reset", 0) > 0:
+            gw_left = max(0, int(stats.gemini_weekly_reset - now_ts))
+            gemini_weekly_reset_hrs = gw_left // 3600
+            gemini_weekly_reset_min = (gw_left % 3600) // 60
+
     live = getattr(stats, "live_activity", None)
     tpm = float(getattr(live, "tokens_per_minute", 0.0) or 0.0)
     is_live = bool(getattr(live, "is_live", False))
@@ -318,6 +344,12 @@ def from_usage_stats(
         codex_weekly_pct=codex_weekly_pct,
         codex_weekly_reset_hrs=codex_weekly_reset_hrs,
         codex_weekly_reset_min=codex_weekly_reset_min,
+        gemini_available=gemini_available,
+        gemini_session_pct=gemini_session_pct,
+        gemini_session_reset_min=gemini_session_reset_min,
+        gemini_weekly_pct=gemini_weekly_pct,
+        gemini_weekly_reset_hrs=gemini_weekly_reset_hrs,
+        gemini_weekly_reset_min=gemini_weekly_reset_min,
         live_tok_per_min=tpm / 1000.0,
         is_live=is_live,
         subagent_count=int(getattr(stats, "active_subagent_count", 0) or 0),

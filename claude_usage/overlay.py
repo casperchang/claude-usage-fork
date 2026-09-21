@@ -56,6 +56,8 @@ GAUGE_HEIGHT = 130
 # Extra height for the optional Codex ring row (a second Session/Weekly pair
 # drawn beneath Claude's; same stack minus the shared top padding).
 CODEX_GAUGE_ROW_HEIGHT = 118
+# Same extra height for the optional Gemini (Google AI Pro) ring row.
+GEMINI_GAUGE_ROW_HEIGHT = 118
 
 # Supported OSD view modes. Kept as string constants so config files and
 # tests don't have to import an enum.
@@ -252,6 +254,13 @@ class UsageOverlay(QWidget):
         self._codex_session_reset: int = 0
         self._codex_weekly_pct: float = 0.0
         self._codex_weekly_reset: int = 0
+        # Optional Gemini provider (Google AI Pro via a running Antigravity).
+        # Same rules as Codex above: unavailable → OSD paints as before.
+        self._gemini_available: bool = False
+        self._gemini_session_pct: float = 0.0
+        self._gemini_session_reset: int = 0
+        self._gemini_weekly_pct: float = 0.0
+        self._gemini_weekly_reset: int = 0
         self._live_tpm: float = 0.0      # tokens/min over the last few minutes
         self._is_live: bool = False       # show the "● LIVE" dot
         self._burn_alert = None           # active burn/spike/storm badge (or None)
@@ -358,7 +367,18 @@ class UsageOverlay(QWidget):
         self._codex_weekly_pct = max(0.0, min(1.0, float(
             getattr(stats, "codex_weekly_utilization", 0.0) or 0.0)))
         self._codex_weekly_reset = int(getattr(stats, "codex_weekly_reset", 0) or 0)
-        if bool(self._scoped_label) != had_scoped or self._codex_available != had_codex:
+        # Optional Gemini provider rows — same footprint rules as Codex.
+        had_gemini = self._gemini_available
+        self._gemini_available = bool(getattr(stats, "gemini_available", False))
+        self._gemini_session_pct = max(0.0, min(1.0, float(
+            getattr(stats, "gemini_session_utilization", 0.0) or 0.0)))
+        self._gemini_session_reset = int(getattr(stats, "gemini_session_reset", 0) or 0)
+        self._gemini_weekly_pct = max(0.0, min(1.0, float(
+            getattr(stats, "gemini_weekly_utilization", 0.0) or 0.0)))
+        self._gemini_weekly_reset = int(getattr(stats, "gemini_weekly_reset", 0) or 0)
+        if (bool(self._scoped_label) != had_scoped
+                or self._codex_available != had_codex
+                or self._gemini_available != had_gemini):
             self._apply_size()
         live = getattr(stats, "live_activity", None)
         if live is not None:
@@ -507,7 +527,7 @@ class UsageOverlay(QWidget):
 
     def _skin_base_height(self) -> float:
         """Unscaled OSD height for the active skin, folding in the optional
-        scoped-cap row and the optional Codex provider rows (5h + 7d).
+        scoped-cap row and the optional Codex/Gemini provider rows (5h + 7d).
 
         ``_apply_size`` (the window) and ``paintEvent`` (the rect handed to the
         skin) both derive their height from HERE so the two can never disagree
@@ -524,6 +544,9 @@ class UsageOverlay(QWidget):
             base = m.get("osd_height_scoped", base + SCOPED_ROW_HEIGHT)
         if self._codex_available:
             base += m.get("codex_rows_height", 2 * SCOPED_ROW_HEIGHT)
+        if self._gemini_available:
+            base += m.get("gemini_rows_height",
+                          m.get("codex_rows_height", 2 * SCOPED_ROW_HEIGHT))
         return base
 
     def _apply_size(self) -> None:
@@ -549,6 +572,8 @@ class UsageOverlay(QWidget):
             base = GAUGE_HEIGHT + (SCOPED_ROW_HEIGHT if self._scoped_label else 0)
             if self._codex_available:
                 base += CODEX_GAUGE_ROW_HEIGHT
+            if self._gemini_available:
+                base += GEMINI_GAUGE_ROW_HEIGHT
         else:
             # Receipt skin always reserves the footer strip for its barcode,
             # even if the user disabled the ticker feature.
@@ -558,6 +583,8 @@ class UsageOverlay(QWidget):
                 base += SCOPED_ROW_HEIGHT
             if self._codex_available:
                 base += 2 * SCOPED_ROW_HEIGHT  # Codex 5h + 7d rows
+            if self._gemini_available:
+                base += 2 * SCOPED_ROW_HEIGHT  # Gemini 5h + 7d rows
         height = MINIMIZED_HEIGHT if self._minimized else int(base * self._scale)
         # Preserve the top-right corner when resizing so the overlay doesn't
         # visually drift as the user scrolls to scale.
@@ -868,8 +895,8 @@ class UsageOverlay(QWidget):
             )
 
         # Two columns splitting the panel; each column is one gauge stack.
-        # With the Codex provider active, a second row of rings (Codex 5h /
-        # 7d) is drawn beneath Claude's Session / Weekly pair.
+        # With the Codex or Gemini provider active, each adds a row of
+        # rings (5h / 7d) beneath Claude's Session / Weekly pair.
         col_w = w / 2
         ring_d = max(50.0, min(col_w * 0.58, 80 * s))
         ring_stroke = max(4.0, 7 * s)
@@ -881,6 +908,11 @@ class UsageOverlay(QWidget):
             ring_rows.append((
                 ("Codex 5h", self._codex_session_pct, self._codex_session_reset),
                 ("Codex 7d", self._codex_weekly_pct, self._codex_weekly_reset),
+            ))
+        if self._gemini_available:
+            ring_rows.append((
+                ("Gemini 5h", self._gemini_session_pct, self._gemini_session_reset),
+                ("Gemini 7d", self._gemini_weekly_pct, self._gemini_weekly_reset),
             ))
         # Centre each ring inside its column, with room below for labels.
         for row_idx, row in enumerate(ring_rows):
@@ -1116,6 +1148,20 @@ class UsageOverlay(QWidget):
             for label, pct, reset_ts in (
                 ("Codex 5h", self._codex_session_pct, self._codex_session_reset),
                 ("Codex 7d", self._codex_weekly_pct, self._codex_weekly_reset),
+            ):
+                y2 = y2 + 15 * s + bar_h + 10 * s
+                self._draw_row(
+                    p, y2, w, pad_x, bar_w, bar_h, bar_r, font_label, font_small,
+                    label=label,
+                    pct=pct,
+                    reset_label=_format_reset_short(reset_ts),
+                )
+
+        # --- Gemini provider rows — only when the gemini provider is active ---
+        if self._gemini_available:
+            for label, pct, reset_ts in (
+                ("Gemini 5h", self._gemini_session_pct, self._gemini_session_reset),
+                ("Gemini 7d", self._gemini_weekly_pct, self._gemini_weekly_reset),
             ):
                 y2 = y2 + 15 * s + bar_h + 10 * s
                 self._draw_row(
