@@ -357,8 +357,13 @@ you're on. Both providers can run at once; their rows stack.
   the Google-model pool (Gemini Pro/Flash); `"3p"` is the third-party pool
   (Claude/GPT served *through* Antigravity). Both belong to the same Google AI
   Pro subscription but are metered separately, so they move independently.
-- **Cheap** — the RPC runs at most once per `gemini_poll_seconds` (default
-  300 s), with an on-disk cache served in between.
+- **Cheap, but honest** — the RPC runs at most once per `gemini_poll_seconds`
+  (default 300 s), with an on-disk cache served in between. Each call asks
+  for a forced refresh: left to itself the language_server returns its own
+  cached copy in ~2 ms, which can lag real usage by percentage points, so
+  the widget pays the ~200 ms round-trip to show what you have actually
+  consumed. Lower `gemini_poll_seconds` if you want it to track an active
+  session more closely.
 - **Graceful** — Antigravity picks a fresh port and CSRF token every launch, so
   the widget rediscovers them on each poll rather than caching a stale address.
   Close the IDE and the last reading is served for up to an hour, after which

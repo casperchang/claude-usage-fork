@@ -251,3 +251,55 @@ def test_collect_expired_window_reports_zero_not_stale():
     assert out["available"] is True
     assert out["session_pct"] == 0.0  # window rolled over
     assert out["session_reset"] == 0
+
+
+# ----------------------------------------------------- freshness (forceRefresh)
+
+def test_post_requests_a_forced_refresh_by_default():
+    """The server hands back its own stale cached entry unless asked to refresh.
+
+    Regression guard: without forceRefresh the RPC answers in ~2ms with numbers
+    that lag real usage by percentage points.
+    """
+    captured = {}
+
+    class _Resp:
+        def read(self):
+            return b"{}"
+        def __enter__(self):
+            return self
+        def __exit__(self, *a):
+            return False
+
+    def fake_urlopen(req, **kw):
+        captured["body"] = req.data
+        # urllib normalises header keys with .capitalize(), not .title().
+        captured["header"] = req.get_header(gemini.CSRF_HEADER.capitalize())
+        return _Resp()
+
+    with patch.object(gemini.urllib.request, "urlopen", fake_urlopen):
+        gemini._post("https", 1234, "tok")
+    assert json.loads(captured["body"]) == {"forceRefresh": True}
+    assert captured["header"] == "tok"
+
+    with patch.object(gemini.urllib.request, "urlopen", fake_urlopen):
+        gemini._post("https", 1234, "tok", force_refresh=False)
+    assert json.loads(captured["body"]) == {}
+
+
+def test_fetch_falls_back_to_cached_entry_when_forced_refresh_fails():
+    """A failing upstream refresh must not blank the rows: take the server cache."""
+    good = _payload([_bucket("gemini-5h", "5h", 0.5, FUTURE)])
+    calls = []
+
+    def fake_post(scheme, port, token, force_refresh=True, **kw):
+        calls.append(force_refresh)
+        return None if force_refresh else good
+
+    with patch.object(gemini, "find_listening_ports", return_value=[4321]), \
+         patch.object(gemini, "_post", fake_post):
+        gemini._last_good = None
+        out = gemini.fetch_quota_summary(1, "tok")
+    assert out == good
+    assert calls[0] is True   # forced refresh attempted first
+    assert False in calls     # then the cached entry

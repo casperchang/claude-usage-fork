@@ -125,13 +125,23 @@ def find_listening_ports(pid: int) -> list[int]:
     return list(dict.fromkeys(ports))
 
 
-def _post(scheme: str, port: int, token: str,
+def _post(scheme: str, port: int, token: str, force_refresh: bool = True,
           timeout: float = RPC_TIMEOUT_SECONDS) -> Any:
-    """POST an empty RetrieveUserQuotaSummary request; return parsed JSON or None."""
+    """POST a RetrieveUserQuotaSummary request; return parsed JSON or None.
+
+    ``force_refresh`` matters a great deal. The language_server keeps its own
+    cached copy of the upstream quota summary and, left to itself, hands that
+    back — it answers in ~2ms with numbers that can lag your real usage by
+    percentage points. Setting the request's ``forceRefresh`` makes it go ask
+    upstream (~200ms) and return what you have actually consumed. Since this
+    module already rate-limits itself to one call per ``poll_seconds``, paying
+    that round-trip is what makes the displayed number true.
+    """
     url = f"{scheme}://127.0.0.1:{port}{RPC_PATH}"
+    body = json.dumps({"forceRefresh": True} if force_refresh else {}).encode()
     req = urllib.request.Request(
         url,
-        data=b"{}",
+        data=body,
         method="POST",
         headers={"Content-Type": "application/json", CSRF_HEADER: token},
     )
@@ -164,12 +174,16 @@ def fetch_quota_summary(pid: int, token: str) -> Any:
                 candidates.append((scheme, port))
 
     for scheme, port in candidates:
-        payload = _post(scheme, port, token)
-        # A Connect error body is a dict with "code"/"message" and no
-        # "response" — treat only a payload we can parse as a hit.
-        if parse_quota_summary(payload) is not None:
-            _last_good = (scheme, port)
-            return payload
+        # Ask for a forced refresh first; fall back to the server's own
+        # cached entry only if that fails, so a slow or failing upstream
+        # still leaves us with something to draw rather than nothing.
+        for force_refresh in (True, False):
+            payload = _post(scheme, port, token, force_refresh=force_refresh)
+            # A Connect error body is a dict with "code"/"message" and no
+            # "response" — treat only a payload we can parse as a hit.
+            if parse_quota_summary(payload) is not None:
+                _last_good = (scheme, port)
+                return payload
     _last_good = None
     return None
 
