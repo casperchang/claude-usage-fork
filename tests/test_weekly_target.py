@@ -7,6 +7,7 @@ pytest.importorskip("PySide6")
 
 from claude_usage.overlay import (  # noqa: E402
     WEEK_SECONDS,
+    _compact_reset_tail,
     _format_days_hours,
     _format_reset_short,
     _weekly_target,
@@ -52,3 +53,12 @@ def test_reset_short_appends_remaining_when_over_a_day():
 def test_reset_short_unchanged_under_a_day():
     assert _format_reset_short(_in(2 * 3600 + 600)).endswith("m")
     assert "(" not in _format_reset_short(_in(2 * 3600 + 600))
+
+
+@pytest.mark.parametrize("label, expected", [
+    ("Thu 02:27 (1 day, 13 hrs)", "Thu 02:27 (1d 13h)"),
+    ("Fri 06:47 (2 days, 1 hr)", "Fri 06:47 (2d 1h)"),
+    ("2h 13m", "2h 13m"),
+])
+def test_compact_reset_tail(label, expected):
+    assert _compact_reset_tail(label) == expected

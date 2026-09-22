@@ -3,7 +3,7 @@
 # Usage: ~/claude-widget.sh {start|stop|restart|status}
 
 # "[b]in" keeps pgrep from matching this script's own command line.
-PATTERN='[b]in/python -m claude_usage'
+PATTERN='[b]in/python[0-9.]* -m claude_usage'
 LOG="$HOME/.cache/claude-usage/widget.log"
 export PATH="$HOME/.local/bin:$PATH"
 

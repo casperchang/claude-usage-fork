@@ -13,6 +13,7 @@ Interactions:
 
 from __future__ import annotations
 
+import re
 from datetime import datetime
 from typing import Any
 
@@ -177,6 +178,14 @@ def _format_reset_short(reset_ts: int) -> str:
         return f"{hours}h {minutes}m" if hours > 0 else f"{minutes}m"
     when = datetime.fromtimestamp(reset_ts).strftime("%a %H:%M")
     return f"{when} ({_format_days_hours(remaining)})"
+
+
+def _compact_reset_tail(reset_label: str) -> str:
+    """'Thu 02:27 (1 day, 13 hrs)' -> 'Thu 02:27 (1d 13h)'; other labels unchanged."""
+    m = re.fullmatch(r"(.*) \((\d+) days?, (\d+) hrs?\)", reset_label)
+    if not m:
+        return reset_label
+    return f"{m.group(1)} ({m.group(2)}d {m.group(3)}h)"
 
 
 def _burn_badge_text(alert) -> str:
@@ -1159,9 +1168,12 @@ class UsageOverlay(QWidget):
 
         # --- Gemini provider rows — only when the gemini provider is active ---
         if self._gemini_available:
-            for label, pct, reset_ts in (
-                ("Gemini 5h", self._gemini_session_pct, self._gemini_session_reset),
-                ("Gemini 7d", self._gemini_weekly_pct, self._gemini_weekly_reset),
+            # The 7d row gets the same even-pace target and bar tick as
+            # Claude's Weekly row.
+            for label, pct, reset_ts, target in (
+                ("Gemini 5h", self._gemini_session_pct, self._gemini_session_reset, None),
+                ("Gemini 7d", self._gemini_weekly_pct, self._gemini_weekly_reset,
+                 _weekly_target(self._gemini_weekly_reset)),
             ):
                 y2 = y2 + 15 * s + bar_h + 10 * s
                 self._draw_row(
@@ -1169,6 +1181,7 @@ class UsageOverlay(QWidget):
                     label=label,
                     pct=pct,
                     reset_label=_format_reset_short(reset_ts),
+                    target=target,
                 )
 
         # --- Ticker strip / receipt footer (below the weekly row) ---
@@ -1380,8 +1393,12 @@ class UsageOverlay(QWidget):
             p.setFont(_mono_font(int(font_small)))
             room = (w - pad_x - pct_width - 8 * self._scale) - (pad_x + label_w + 6 * self._scale)
             if rw > room and " (" in reset_label:
-                reset_label = reset_label.split(" (")[0]
+                # First try the compact tail "(1d 13h)", then drop it.
+                reset_label = _compact_reset_tail(reset_label)
                 rw = fm_small.horizontalAdvance(reset_label)
+                if rw > room:
+                    reset_label = reset_label.split(" (")[0]
+                    rw = fm_small.horizontalAdvance(reset_label)
             p.drawText(
                 QPointF(w - pad_x - pct_width - 8 * self._scale - rw, baseline),
                 reset_label,
