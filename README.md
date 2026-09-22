@@ -1,4 +1,4 @@
-# Claude Usage Widget — fork with weekly pace target
+# Claude Usage Widget — fork with weekly pace target and Google AI Pro meter
 
 > **This is a fork of [bozdemir/claude-usage-widget](https://github.com/bozdemir/claude-usage-widget)** (MIT), based on upstream **v0.12.5**. All the hard work — the Qt overlay, the usage collector, skins, themes, forecasts, cost tracking — is the original author's. This fork only adds the small changes below. Please star and support the original project.
 
@@ -12,6 +12,11 @@
   <em>Click the card for details, now with an <b>Even-pace target</b> line: how many points ahead of or behind pace you are. (Sample data, not real usage.)</em>
 </p>
 
+<p align="center">
+  <img src="screenshots/fork-osd-gemini.png" alt="Floating card with Claude Session and Weekly rows, and Gemini 5h and Gemini 7d rows beneath them" width="520" /><br/>
+  <em>With <code>"providers": ["claude", "gemini"]</code>, your <b>Google AI Pro</b> quota sits under Claude's: <b>Gemini 5h</b> and <b>Gemini 7d</b>, read from the running Antigravity IDE. (Sample data, not real usage.)</em>
+</p>
+
 ## What this fork adds
 
 | Change | Where |
@@ -22,8 +27,9 @@
 | **Details popup** — an *Even-pace target* line: `61% (29 pts behind pace, quota may go unused)`. | `widget.py` |
 | **Status-line feed** — `scripts/statusline-usage.sh` copies the rate limits Claude Code already has into a file the widget reads. This avoids the shared `/api/oauth/usage` endpoint returning HTTP 429, which made the stock widget silently show stale numbers (e.g. 0 % while the real value was 16 %). | `scripts/` |
 | **`scripts/claude-widget.sh`** — `start`, `stop`, `restart`, `status` for the widget. | `scripts/` |
+| **Google AI Pro meter** — Gemini 5h and weekly rows under Claude's, read from the Antigravity IDE's own local quota endpoint (the numbers its quota panel shows). Opt-in; see [Google AI Pro via Antigravity](#google-ai-pro-via-antigravity-opt-in). | `gemini.py`, `overlay.py`, skins |
 
-Planned: several Claude accounts and Google AI Pro / Antigravity quota in one widget, fed from a small collector on one always-on machine.
+Planned: several Claude accounts in one widget, fed from a small collector on one always-on machine.
 
 ### How the target works
 

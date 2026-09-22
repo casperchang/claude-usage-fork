@@ -7,7 +7,8 @@ publish. Qt's ``offscreen`` platform is used: no window appears on screen.
 Run from the repo root:
     uv run --with pyside6-essentials --with certifi python scripts/gen_fork_screenshots.py
 
-Outputs: ``screenshots/fork-osd.png`` and ``screenshots/fork-popup.png``.
+Outputs: ``screenshots/fork-osd.png``, ``screenshots/fork-osd-gemini.png``
+and ``screenshots/fork-popup.png``.
 """
 
 from __future__ import annotations
@@ -66,6 +67,17 @@ def sample_stats() -> UsageStats:
     return stats
 
 
+def with_gemini(stats: UsageStats) -> UsageStats:
+    """Add sample Google AI Pro rows: 18 % of the 5h window, 12 % of the week."""
+    now = time.time()
+    stats.gemini_available = True
+    stats.gemini_session_utilization = 0.18
+    stats.gemini_session_reset = int(now + 3 * 3600 + 41 * 60)
+    stats.gemini_weekly_utilization = 0.12
+    stats.gemini_weekly_reset = int(now + 1 * 86400 + 13 * 3600)
+    return stats
+
+
 def _backdrop(w: int, h: int) -> QImage:
     """A plain aubergine gradient so the card reads as a floating desktop widget."""
     img = QImage(w, h, QImage.Format.Format_ARGB32)
@@ -78,14 +90,8 @@ def _backdrop(w: int, h: int) -> QImage:
     return img
 
 
-def main() -> int:
-    os.makedirs(OUTPUT_DIR, exist_ok=True)
-    app = QApplication([])
-    cfg = load_config(os.path.join(REPO_ROOT, "config.json.example"))
-    cfg = {**cfg, "osd_opacity": 1.0, "show_ticker": True, "osd_scale": OSD_SCALE,
-           "osd_view_mode": VIEW_MODE_BARS}
-    stats = sample_stats()
-
+def _save_osd(app: QApplication, cfg: dict, stats: UsageStats, name: str) -> None:
+    """Render the floating card for *stats* onto the backdrop and save it."""
     overlay = UsageOverlay(cfg)
     overlay.update_stats(stats)
     overlay._ticker_offset = 260.0
@@ -100,7 +106,19 @@ def main() -> int:
     p = QPainter(canvas)
     p.drawImage(pad, pad, card)
     p.end()
-    canvas.save(os.path.join(OUTPUT_DIR, "fork-osd.png"), "PNG")
+    canvas.save(os.path.join(OUTPUT_DIR, name), "PNG")
+
+
+def main() -> int:
+    os.makedirs(OUTPUT_DIR, exist_ok=True)
+    app = QApplication([])
+    cfg = load_config(os.path.join(REPO_ROOT, "config.json.example"))
+    cfg = {**cfg, "osd_opacity": 1.0, "show_ticker": True, "osd_scale": OSD_SCALE,
+           "osd_view_mode": VIEW_MODE_BARS}
+    stats = sample_stats()
+
+    _save_osd(app, cfg, stats, "fork-osd.png")
+    _save_osd(app, cfg, with_gemini(sample_stats()), "fork-osd-gemini.png")
 
     popup = UsagePopup({**cfg, "osd_scale": 1.0})
     popup.resize(540, 400)
@@ -115,7 +133,7 @@ def main() -> int:
     # Keep the plan-limits part; the cost sections below are not what this fork changes.
     shot.copy(0, 0, shot.width(), min(shot.height(), 670)).save(
         os.path.join(OUTPUT_DIR, "fork-popup.png"), "PNG")
-    print("Saved screenshots/fork-osd.png and screenshots/fork-popup.png")
+    print("Saved screenshots/fork-osd.png, fork-osd-gemini.png and fork-popup.png")
     return 0
 
 
